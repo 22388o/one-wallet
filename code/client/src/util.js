@@ -119,7 +119,7 @@ const util = {
     return address === ONEConstants.TreasuryAddress || ONEConstants.OldTreasuryAddresses.includes(address)
   },
 
-  isBlacklistedAddress: address =>{
+  isBlacklistedAddress: address => {
     return ONEConstants.BlacklistedAddresses.includes(address)
   },
 
@@ -308,6 +308,16 @@ export const updateQRCodeState = (newValue, state) => {
 export const generateOtpSeed = () => {
   const otpSeedBuffer = new Uint8Array(32)
   return window.crypto.getRandomValues(otpSeedBuffer)
+}
+
+export const checkCamera = async () => {
+  try {
+    const d = await navigator.mediaDevices.enumerateDevices()
+    const cams = d.filter(e => e.kind === 'videoinput')
+    return [cams.length > 0, cams]
+  } catch (e) {
+    return [false, []]
+  }
 }
 
 export function getWindowDimensions () {
