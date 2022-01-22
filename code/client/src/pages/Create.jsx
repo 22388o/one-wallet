@@ -6,7 +6,6 @@ import api from '../api'
 import ONEUtil from '../../../lib/util'
 import ONEConstants from '../../../lib/constants'
 import ONENames from '../../../lib/names'
-// import { uniqueNamesGenerator, colors, animals } from 'unique-names-generator'
 import Row from 'antd/es/row'
 import Slider from 'antd/es/slider'
 import Tooltip from 'antd/es/tooltip'
@@ -23,7 +22,6 @@ import qrcode from 'qrcode'
 import storage from '../storage'
 import walletActions from '../state/modules/wallet/actions'
 import { balanceActions } from '../state/modules/balance'
-import cacheActions from '../state/modules/cache/actions'
 import WalletConstants from '../constants/wallet'
 import util, { useWindowDimensions, OSType, generateOtpSeed } from '../util'
 import { handleAPIError, handleAddressError } from '../handler'
@@ -37,13 +35,6 @@ import { buildQRCodeComponent, getQRCodeUri, getSecondCodeName, OTPUriMode } fro
 import { OtpSetup, TwoCodeOption } from '../components/OtpSetup'
 import config from '../config'
 const { Text, Link } = Typography
-
-// const genName = () => uniqueNamesGenerator({
-//   dictionaries: [colors, animals],
-//   style: 'capital',
-//   separator: ' ',
-//   length: 1
-// })
 
 const getGoogleAuthenticatorAppLink = (os) => {
   let link = 'https://apps.apple.com/us/app/google-authenticator/id388497605'
@@ -136,12 +127,12 @@ const Create = ({ expertMode, showRecovery }) => {
   }, [name, code, network, effectiveTime])
 
   useEffect(() => {
-    if (section === sectionViews.setupOtp && worker) {
-      // console.log('Posting to worker. Security parameters:', securityParameters)
+    if (section === sectionViews.setupOtp && worker && seed) {
       const t = Math.floor(Date.now() / WalletConstants.interval6) * WalletConstants.interval6
       const salt = ONEUtil.hexView(generateOtpSeed())
       setEffectiveTime(t)
       if (worker) {
+        message.debug(`[Create] posting to worker salt=${salt}`)
         worker.postMessage({
           salt,
           seed,
@@ -159,7 +150,7 @@ const Create = ({ expertMode, showRecovery }) => {
         worker.onmessage = (event) => {
           const { status, current, total, stage, result, salt: workerSalt } = event.data
           if (workerSalt && workerSalt !== salt) {
-            // console.log(`Discarding outdated worker result (salt=${workerSalt}, expected=${salt})`)
+            message.debug(`Discarding outdated worker result (salt=${workerSalt}, expected=${salt})`)
             return
           }
           if (status === 'working') {
@@ -168,6 +159,7 @@ const Create = ({ expertMode, showRecovery }) => {
             setProgressStage(stage)
           }
           if (status === 'done') {
+            message.debug(`[Create] done salt=${salt}`)
             const { hseed, root, layers, maxOperationsPerInterval, innerTrees } = result
             setRoot(root)
             setHseed(hseed)

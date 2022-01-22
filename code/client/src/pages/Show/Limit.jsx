@@ -4,7 +4,7 @@ import { OtpStack, useOtpState } from '../../components/OtpStack'
 import React, { useState } from 'react'
 import { useRandomWorker } from './randomWorker'
 import BN from 'bn.js'
-import ShowUtils from './show-util'
+import ShowUtils, { retryUpgrade } from './show-util'
 import { EOTPDerivation, SmartFlows } from '../../../../lib/api/flow'
 import ONE from '../../../../lib/onewallet'
 import { api } from '../../../../lib/api'
@@ -13,7 +13,7 @@ import AnimatedSection from '../../components/AnimatedSection'
 import Button from 'antd/es/button'
 import CloseOutlined from '@ant-design/icons/CloseOutlined'
 import Col from 'antd/es/col'
-import { Warning, WideLabel } from '../../components/Text'
+import { Warning, WideLabel, Link } from '../../components/Text'
 import { CommitRevealProgress } from '../../components/CommitRevealProgress'
 import { AverageRow, TallRow } from '../../components/Grid'
 import humanizeDuration from 'humanize-duration'
@@ -70,6 +70,7 @@ const Limit = ({
   const waitTimeForAdjustmentText = humanizeDuration(waitTimeForAdjustment, { largest: 2, round: true })
 
   const moreAuthRequired = targetSpendingLimit.gt(maxNormalTargetSpendingLimit) || (!canUseRegularAdjust && targetSpendingLimit.gt(currentSpendingLimit))
+  const hasSuperOTP = wallet?.innerRoots?.length >= 1
   const impossibleToAdjust = (!canUseRegularAdjust && targetSpendingLimit.gt(historicalHighSpendingLimit)) ||
     (targetSpendingLimit.gt(BN.max(maxNormalTargetSpendingLimit, historicalHighSpendingLimit)))
 
@@ -88,7 +89,7 @@ const Limit = ({
     }
   }
 
-  console.log(marks)
+  // console.log(marks)
 
   const resetOtps = () => {
     for (let i = otpStates.length - 1; i >= 0; i--) {
@@ -141,6 +142,20 @@ const Limit = ({
       revealArgs: { ...ONEConstants.NullOperationParams, amount, operationType: moreAuthRequired ? ONEConstants.OperationType.JUMP_SPENDING_LIMIT : ONEConstants.OperationType.CHANGE_SPENDING_LIMIT },
       ...helpers,
     })
+  }
+
+  if (!(wallet.majorVersion >= 15)) {
+    return (
+      <AnimatedSection
+        style={{ maxWidth: 720 }}
+        title={<Title level={isMobile ? 5 : 2}>Change Spending Limit</Title>}
+        extra={[<Button key='close' type='text' icon={<CloseOutlined />} onClick={onClose} />]}
+      >
+        <Warning>
+          Your wallet needs to be at least v15 to change spending limit. Please <Link onClick={() => retryUpgrade({ dispatch, history, address })}>upgrade your wallet</Link>.
+        </Warning>
+      </AnimatedSection>
+    )
   }
 
   return (
@@ -198,7 +213,7 @@ const Limit = ({
           marks={marks}
         />
       </TallRow>
-      <TallRow align='middle'>
+      <TallRow align='middle' style={{ marginTop: 64 }}>
         {impossibleToAdjust && <Warning style={{ marginTop: 48 }}>You cannot increase limit that much at the moment. You have to wait for {waitTimeForAdjustmentText}</Warning>}
         {!impossibleToAdjust &&
           <Col span={24}>
@@ -211,7 +226,9 @@ const Limit = ({
                 shouldAutoFocus={!moreAuthRequired}
                 action='change limit now'
               />}
-            {moreAuthRequired &&
+            {moreAuthRequired && !hasSuperOTP &&
+              <Text>Restoring to all-time-high limit requires you to unlock v15 features, since your wallet was created prior to v15. Please <Link onClick={() => history.push(Paths.showAddress(address, 'extend'))}>renew your wallet</Link> to unlock them now.</Text>}
+            {moreAuthRequired && hasSuperOTP &&
               <OtpSuperStack
                 otpStates={otpStates}
                 action='submit for validation'
